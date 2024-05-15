@@ -1,0 +1,146 @@
+<!-- views/index.erb -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Weather Forecast</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    body {
+      background-color: #f8f9fa;
+      padding-top: 50px;
+      text-align: center;
+    }
+    .container {
+      max-width: 800px;
+      margin: auto;
+    }
+    #weather-info {
+      margin-top: 20px;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    #map {
+      height: 350px;
+      margin-top: 20px;
+      border-radius: 20px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    .sunny {
+      background-color: #ffeb3b;
+    }
+    .rainy {
+      background-color: #03a9f4;
+    }
+    .cloudy {
+      background-color: #9e9e9e;
+    }
+    .description {
+      font-size: 18px;
+      margin-top: 10px;
+    }
+    @media screen and (max-width: 600px) {
+      .container {
+        width: 90%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Daily Weather Forecast</h1>
+    <div id="map"></div>
+    <div id="weather-info" class="sunny">
+      <p>Loading...</p>
+    </div>
+    <script>
+      function initMap() {
+        var map = new google.maps.Map(document.getElementById('map'), {
+          zoom: 10,
+          center: {lat: -34.397, lng: 150.644} // Default center coordinates
+        });
+        
+        // Get user's current location
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(function(position) {
+            var pos = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            };
+
+            map.setCenter(pos);
+
+            var marker = new google.maps.Marker({
+              position: pos,
+              map: map
+            });
+          }, function() {
+            console.error("Unable to retrieve your location.");
+          });
+        } else {
+          console.error("Geolocation is not supported by this browser.");
+        }
+      }
+
+      function getWeather() {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(success, error);
+        } else {
+          console.error("Geolocation is not supported by this browser.");
+        }
+      }
+
+      function success(position) {
+        var latitude = position.coords.latitude;
+        var longitude = position.coords.longitude;
+        
+        fetchWeather(latitude, longitude);
+      }
+
+      function error() {
+        console.error("Unable to retrieve your location");
+        document.getElementById('weather-info').innerHTML = 'Error: Unable to retrieve your location.';
+      }
+
+      function fetchWeather(latitude, longitude) {
+        fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=<%= api_key %>&units=metric`)
+          .then(response => response.json())
+          .then(data => {
+            const city = data.name;
+            const temperature = data.main.temp;
+            const humidity = data.main.humidity;
+            const description = capitalizeFirstLetter(data.weather[0].description);
+            const wind_speed = data.wind.speed;
+            const weatherType = data.weather[0].main.toLowerCase(); // Get weather type for dynamic styling
+
+            document.getElementById('weather-info').className = weatherType; // Add weather type as class for dynamic styling
+
+            document.getElementById('weather-info').innerHTML = `
+              <h2>${city}</h2>
+              <p>Temperature: ${temperature}°C</p>
+              <p>Humidity: ${humidity}%</p>
+              <p class="description">Description: ${description}</p>
+              <p>Wind Speed: ${wind_speed} m/s</p>
+            `;
+          })
+          .catch(error => {
+            console.error('Error fetching weather:', error);
+            document.getElementById('weather-info').innerHTML = 'Error fetching weather information.';
+          });
+      }
+
+      function capitalizeFirstLetter(string) {
+        return string.charAt(0).toUpperCase() + string.slice(1);
+      }
+
+      document.addEventListener('DOMContentLoaded', function() {
+        getWeather();
+        initMap();
+      });
+    </script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDJgdzprqOb-fshVmUyhu-4bR6qtCBVUPQ&callback=initMap"></script>
+  </div>
+</body>
+</html>

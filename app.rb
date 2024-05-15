@@ -1,9 +1,10 @@
-require "sinatra"
-require "sinatra/reloader"
+require 'sinatra'
+require 'httparty'
 
-get("/") do
-  "
-  <h1>Welcome to your Sinatra App!</h1>
-  <p>Define some routes in app.rb</p>
-  "
+# Set OpenWeatherMap API key
+API_KEY = '8caa0b2199c5d28cd28331763d55aed9'
+
+# Home route
+get '/' do
+  erb :index, locals: { api_key: API_KEY }
 end
