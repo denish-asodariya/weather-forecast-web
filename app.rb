@@ -3,8 +3,8 @@ require 'httparty'
 require 'json'
 
 # Set OpenWeatherMap API key
-API_KEY = '8caa0b2199c5d28cd28331763d55aed9'
-OPENAI_API_KEY = 'sk-proj-DgMU3ASFSW0wYEAS5h96T3BlbkFJtFOFBmkasGRv2P29wi26' # Update this with your OpenAI API key
+API_KEY = 'api'
+OPENAI_API_KEY = 'api' # Update this with your OpenAI API key
 
 # Home route
 get '/' do
@@ -43,7 +43,8 @@ post '/recommendations' do
 
   if openai_response.code == 200
     begin
-      content = openai_response['choices'][0]['message']['content']
+      # Remove the ```json and ``` delimiters
+      content = openai_response['choices'][0]['message']['content'].gsub(/```json|```/, '').strip
       puts "Raw Content: #{content}"  # Log the raw content received
 
       recommendations = JSON.parse(content)
@@ -67,7 +68,7 @@ post '/recommendations' do
 end
 
 def parse_recommendations(response)
-  response.map do |category, items|
+  response.flat_map do |category, items|
     items.map do |item|
       {
         name: item['name'],
@@ -77,5 +78,5 @@ def parse_recommendations(response)
         description: item['description']
       }
     end
-  end.flatten
+  end
 end
