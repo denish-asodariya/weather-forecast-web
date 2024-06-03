@@ -2,13 +2,17 @@ require 'sinatra'
 require 'httparty'
 require 'json'
 
-# Set OpenWeatherMap API key
-API_KEY = 'api'
-OPENAI_API_KEY = 'api' # Update this with your OpenAI API key
+# Set API keys
+OPENWEATHERMAP_API_KEY = 'API_KEY'
+OPENAI_API_KEY = 'API_KEY' # Update this with your OpenAI API key
+GOOGLE_MAPS_API_KEY = 'API_KEY'
 
 # Home route
 get '/' do
-  erb :index, locals: { api_key: API_KEY }
+  erb :index, locals: { 
+    openweathermap_api_key: OPENWEATHERMAP_API_KEY,
+    google_maps_api_key: GOOGLE_MAPS_API_KEY
+  }
 end
 
 post '/recommendations' do
@@ -75,7 +79,8 @@ def parse_recommendations(response)
         latitude: item['latitude'],
         longitude: item['longitude'],
         address: item['address'],
-        description: item['description']
+        description: item['description'],
+        category: category
       }
     end
   end

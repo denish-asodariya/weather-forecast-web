@@ -11,14 +11,15 @@
       background-size: cover;
       padding-top: 50px;
       text-align: center;
-      
+      color: #333;
     }
     .container {
       max-width: 800px;
       margin: auto;
-      background-color: rgba(255, 255, 255, 0.8);
+      background-color: rgba(255, 255, 255, 0.9);
       border-radius: 10px;
       padding: 20px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
     }
     #weather-info {
       margin-top: 20px;
@@ -29,7 +30,7 @@
     #map {
       height: 350px;
       margin-top: 20px;
-      border-radius: 20px;
+      border-radius: 10px;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     }
     .sunny {
@@ -45,10 +46,26 @@
       font-size: 18px;
       margin-top: 10px;
     }
+    .recommendation-category {
+      font-size: 20px;
+      font-weight: bold;
+      margin-top: 20px;
+      color: #333;
+    }
+    .recommendation-item {
+      margin-top: 10px;
+      padding: 10px;
+      background-color: #f7f7f7;
+      border-radius: 5px;
+      box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+    }
     @media screen and (max-width: 600px) {
       .container {
         width: 90%;
       }
+    }
+    .spinner-border {
+      margin-top: 20px;
     }
   </style>
 </head>
@@ -60,50 +77,77 @@
       <p>Loading...</p>
     </div>
     <button id="recommendations-button" class="btn btn-primary mt-3">Show Recommendations</button>
-    <div id="recommendations-info" class="mt-3">
+    <div id="recommendations-info" class="mt-3 collapse">
       <p>Loading recommendations...</p>
     </div>
+    <div id="loading-spinner" class="spinner-border text-primary" role="status" style="display: none;">
+      <span class="sr-only">Loading...</span>
+    </div>
     <script>
-      const apiKey = '<%= api_key %>';
+      const openWeatherMapApiKey = '<%= openweathermap_api_key %>';
+      const googleMapsApiKey = '<%= google_maps_api_key %>';
       let map;
       let markers = [];
+
+      const icons = {
+        currentLocation: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png',
+        restaurant: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
+        musicalEvent: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+        sportsEvent: 'http://maps.google.com/mapfiles/ms/icons/yellow-dot.png'
+      };
 
       function initMap() {
         map = new google.maps.Map(document.getElementById('map'), {
           zoom: 10,
           center: {lat: -34.397, lng: 150.644} // Default center coordinates
         });
-        
+
         if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(function(position) {
-            var pos = {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude
-            };
+          navigator.geolocation.getCurrentPosition(
+            position => {
+              const pos = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude
+              };
 
-            map.setCenter(pos);
+              map.setCenter(pos);
 
-            var marker = new google.maps.Marker({
-              position: pos,
-              map: map,
-              label: 'You are here'
-            });
+              var marker = new google.maps.Marker({
+                position: pos,
+                map: map,
+                icon: icons.currentLocation,
+                title: 'You are here'
+              });
 
-            getWeather(pos.lat, pos.lng);
-          }, function() {
-            console.error("Unable to retrieve your location.");
-          });
+              getWeather(pos.lat, pos.lng);
+            },
+            () => {
+              handleLocationError(true, map.getCenter());
+            }
+          );
         } else {
-          console.error("Geolocation is not supported by this browser.");
+          // Browser doesn't support Geolocation
+          handleLocationError(false, map.getCenter());
         }
       }
 
+      function handleLocationError(browserHasGeolocation, pos) {
+        console.error(
+          browserHasGeolocation
+            ? "Error: The Geolocation service failed."
+            : "Error: Your browser doesn't support geolocation."
+        );
+        // Fallback to a default location or message
+        getWeather(pos.lat, pos.lng);
+      }
+
       function getWeather(lat, lon) {
-        fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`)
+        fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${openWeatherMapApiKey}&units=metric`)
           .then(response => response.json())
           .then(data => {
             const city = data.name;
             const temperature = data.main.temp;
+            const feels_like = data.main.feels_like;
             const humidity = data.main.humidity;
             const description = capitalizeFirstLetter(data.weather[0].description);
             const wind_speed = data.wind.speed;
@@ -113,9 +157,10 @@
             document.getElementById('weather-info').innerHTML = `
               <h2>${city}</h2>
               <p>Temperature: ${temperature}°C</p>
+              <p>Feels Like: ${feels_like}°C</p>
               <p>Humidity: ${humidity}%</p>
-              <p class="description">Description: ${description}</p>
               <p>Wind Speed: ${wind_speed} m/s</p>
+              <p class="description">Description: ${description}</p>
             `;
           })
           .catch(error => {
@@ -130,17 +175,37 @@
 
       function showRecommendations() {
         document.getElementById('recommendations-info').innerHTML = 'Loading recommendations...';
+        document.getElementById('loading-spinner').style.display = 'block';
         fetchRecommendations()
           .then(locations => {
+            document.getElementById('loading-spinner').style.display = 'none';
+            document.getElementById('recommendations-info').classList.add('show');
             document.getElementById('recommendations-info').innerHTML = '';
             clearMarkers();
             if (locations.length > 0) {
               locations.forEach((location, index) => {
                 const position = { lat: location.latitude, lng: location.longitude };
                 const label = location.name;
-                addMarker(position, label, index);
+                let icon;
+                switch(location.category) {
+                  case 'restaurant':
+                    icon = icons.restaurant;
+                    break;
+                  case 'musicalEvent':
+                    icon = icons.musicalEvent;
+                    break;
+                  case 'sportsEvent':
+                    icon = icons.sportsEvent;
+                    break;
+                  default:
+                    icon = icons.default;
+                }
+                addMarker(position, label, index, icon);
                 document.getElementById('recommendations-info').innerHTML += `
-                  <p>${label}: ${location.address} - ${location.description}</p>
+                  <div class="recommendation-item">
+                    <strong>${label}</strong>
+                    <p>${location.address} - ${location.description}</p>
+                  </div>
                 `;
               });
             } else {
@@ -150,6 +215,7 @@
           .catch(error => {
             console.error('Error fetching recommendations:', error);
             document.getElementById('recommendations-info').innerHTML = 'Error fetching recommendations.';
+            document.getElementById('loading-spinner').style.display = 'none';
           });
       }
 
@@ -164,7 +230,17 @@
         .then(response => response.json())
         .then(data => {
           console.log('Fetched Recommendations:', data);
-          return data.recommendations;
+          // Add category to each recommendation for icon switching
+          return data.recommendations.map(rec => {
+            if (rec.name.toLowerCase().includes('restaurant')) {
+              rec.category = 'restaurant';
+            } else if (rec.name.toLowerCase().includes('music')) {
+              rec.category = 'musicalEvent';
+            } else if (rec.name.toLowerCase().includes('sport')) {
+              rec.category = 'sportsEvent';
+            }
+            return rec;
+          });
         })
         .catch(error => {
           console.error('Error in fetchRecommendations:', error);
@@ -172,11 +248,11 @@
         });
       }
 
-      function addMarker(position, label, index) {
+      function addMarker(position, label, index, icon) {
         const marker = new google.maps.Marker({
           position,
           map,
-          label: `${index + 1}`,
+          icon,
           title: label
         });
         markers.push(marker);
@@ -193,7 +269,7 @@
         initMap();
       });
     </script>
-    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDJgdzprqOb-fshVmUyhu-4bR6qtCBVUPQ&callback=initMap"></script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=<%= google_maps_api_key %>&callback=initMap"></script>
   </div>
 </body>
 </html>
